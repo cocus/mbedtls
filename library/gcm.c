@@ -474,8 +474,12 @@ int mbedtls_gcm_update( mbedtls_gcm_context *ctx,
 
     /* Total length is restricted to 2^39 - 256 bits, ie 2^36 - 2^5 bytes
      * Also check for possible overflow */
+#if ( defined(_MSC_VER) && _MSC_VER == 1200L )
+    if( ctx->len + input_length < ctx->len )
+#else
     if( ctx->len + input_length < ctx->len ||
         (uint64_t) ctx->len + input_length > 0xFFFFFFFE0ull )
+#endif
     {
         return( MBEDTLS_ERR_GCM_BAD_INPUT );
     }

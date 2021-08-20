@@ -2909,6 +2909,7 @@ static int ssl_resume_server_key_exchange( mbedtls_ssl_context *ssl,
 static int ssl_prepare_server_key_exchange( mbedtls_ssl_context *ssl,
                                             size_t *signature_len )
 {
+	size_t out_buf_len;
     const mbedtls_ssl_ciphersuite_t *ciphersuite_info =
         ssl->handshake->ciphersuite_info;
 
@@ -2925,9 +2926,9 @@ static int ssl_prepare_server_key_exchange( mbedtls_ssl_context *ssl,
 
 #if defined(MBEDTLS_KEY_EXCHANGE_WITH_SERVER_SIGNATURE_ENABLED)
 #if defined(MBEDTLS_SSL_VARIABLE_BUFFER_LENGTH)
-    size_t out_buf_len = ssl->out_buf_len - ( ssl->out_msg - ssl->out_buf );
+    out_buf_len = ssl->out_buf_len - ( ssl->out_msg - ssl->out_buf );
 #else
-    size_t out_buf_len = MBEDTLS_SSL_OUT_BUFFER_LEN - ( ssl->out_msg - ssl->out_buf );
+    out_buf_len = MBEDTLS_SSL_OUT_BUFFER_LEN - ( ssl->out_msg - ssl->out_buf );
 #endif
 #endif
 

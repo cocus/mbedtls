@@ -2158,7 +2158,11 @@
  *
  * This module provides debugging functions.
  */
+#if ( defined(_MSC_VER) && _MSC_VER == 1200L )
+//#define MBEDTLS_DEBUG_C
+#else
 #define MBEDTLS_DEBUG_C
+#endif
 
 /**
  * \def MBEDTLS_DES_C
@@ -2603,7 +2607,11 @@
  *           or MBEDTLS_PSA_CRYPTO_EXTERNAL_RNG.
  *
  */
+#if ( defined(_MSC_VER) && _MSC_VER == 1200L )
+//#define MBEDTLS_PSA_CRYPTO_C
+#else
 #define MBEDTLS_PSA_CRYPTO_C
+#endif
 
 /**
  * \def MBEDTLS_PSA_CRYPTO_SE_C
@@ -2632,7 +2640,11 @@
  *           either MBEDTLS_PSA_ITS_FILE_C or a native implementation of
  *           the PSA ITS interface
  */
+#if ( defined(_MSC_VER) && _MSC_VER == 1200L )
+//#define MBEDTLS_PSA_CRYPTO_STORAGE_C
+#else
 #define MBEDTLS_PSA_CRYPTO_STORAGE_C
+#endif
 
 /**
  * \def MBEDTLS_PSA_ITS_FILE_C
@@ -2644,7 +2656,11 @@
  *
  * Requires: MBEDTLS_FS_IO
  */
+#if ( defined(_MSC_VER) && _MSC_VER == 1200L )
+//#define MBEDTLS_PSA_ITS_FILE_C
+#else
 #define MBEDTLS_PSA_ITS_FILE_C
+#endif
 
 /**
  * \def MBEDTLS_RIPEMD160_C

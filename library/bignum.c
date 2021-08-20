@@ -1763,11 +1763,14 @@ cleanup:
  */
 int mbedtls_mpi_mul_int( mbedtls_mpi *X, const mbedtls_mpi *A, mbedtls_mpi_uint b )
 {
+	int ret = MBEDTLS_ERR_ERROR_CORRUPTION_DETECTED;
+    size_t n;
+
     MPI_VALIDATE_RET( X != NULL );
     MPI_VALIDATE_RET( A != NULL );
 
     /* mpi_mul_hlp can't deal with a leading 0. */
-    size_t n = A->n;
+	n = A->n;
     while( n > 0 && A->p[n - 1] == 0 )
         --n;
 
@@ -1778,8 +1781,7 @@ int mbedtls_mpi_mul_int( mbedtls_mpi *X, const mbedtls_mpi *A, mbedtls_mpi_uint 
         return( mbedtls_mpi_lset( X, 0 ) );
     }
 
-    /* Calculate A*b as A + A*(b-1) to take advantage of mpi_mul_hlp */
-    int ret = MBEDTLS_ERR_ERROR_CORRUPTION_DETECTED;
+	/* Calculate A*b as A + A*(b-1) to take advantage of mpi_mul_hlp */
     /* In general, A * b requires 1 limb more than b. If
      * A->p[n - 1] * b / b == A->p[n - 1], then A * b fits in the same
      * number of limbs as A and the call to grow() is not required since
@@ -2281,8 +2283,9 @@ static size_t mbedtls_mpi_cf_bool_eq( size_t x, size_t y )
 static int mpi_select( mbedtls_mpi *R, const mbedtls_mpi *T, size_t T_size, size_t idx )
 {
     int ret = MBEDTLS_ERR_ERROR_CORRUPTION_DETECTED;
+	size_t i;
 
-    for( size_t i = 0; i < T_size; i++ )
+    for( i = 0; i < T_size; i++ )
     {
         MBEDTLS_MPI_CHK( mbedtls_mpi_safe_cond_assign( R, &T[i],
                         (unsigned char) mbedtls_mpi_cf_bool_eq( i, idx ) ) );

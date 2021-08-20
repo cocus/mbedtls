@@ -53,6 +53,11 @@
 
 #define IS_EINTR( ret ) ( ( ret ) == WSAEINTR )
 
+#if ( defined(_MSC_VER) && _MSC_VER == 1200L )
+#include <WinSock2.h>
+
+#include <WS2tcpip.h>
+#else
 #if !defined(_WIN32_WINNT)
 /* Enables getaddrinfo() & Co */
 #define _WIN32_WINNT 0x0501
@@ -64,6 +69,7 @@
 #include <windows.h>
 #if (_WIN32_WINNT < 0x0501)
 #include <wspiapi.h>
+#endif
 #endif
 
 #if defined(_MSC_VER)
@@ -175,45 +181,47 @@ int mbedtls_net_connect( mbedtls_net_context *ctx, const char *host,
                          const char *port, int proto )
 {
     int ret = MBEDTLS_ERR_ERROR_CORRUPTION_DETECTED;
-    struct addrinfo hints, *addr_list, *cur;
+
+	SOCKADDR_IN sockAddr;
 
     if( ( ret = net_prepare() ) != 0 )
         return( ret );
 
-    /* Do name resolution with both IPv6 and IPv4 */
-    memset( &hints, 0, sizeof( hints ) );
-    hints.ai_family = AF_UNSPEC;
-    hints.ai_socktype = proto == MBEDTLS_NET_PROTO_UDP ? SOCK_DGRAM : SOCK_STREAM;
-    hints.ai_protocol = proto == MBEDTLS_NET_PROTO_UDP ? IPPROTO_UDP : IPPROTO_TCP;
+	/* Code taken from VC++ 6.0's MFC Sockcore.cpp */
+	memset(&sockAddr,0,sizeof(sockAddr));
 
-    if( getaddrinfo( host, port, &hints, &addr_list ) != 0 )
-        return( MBEDTLS_ERR_NET_UNKNOWN_HOST );
+	sockAddr.sin_family = AF_INET;
+	sockAddr.sin_addr.s_addr = inet_addr(host);
+	sockAddr.sin_port = htons((u_short)atoi(port));
 
-    /* Try the sockaddrs until a connection succeeds */
-    ret = MBEDTLS_ERR_NET_UNKNOWN_HOST;
-    for( cur = addr_list; cur != NULL; cur = cur->ai_next )
+	if (sockAddr.sin_addr.s_addr == INADDR_NONE)
+	{
+		LPHOSTENT lphost;
+		lphost = gethostbyname(host);
+		if (lphost != NULL)
+			sockAddr.sin_addr.s_addr = ((LPIN_ADDR)lphost->h_addr)->s_addr;
+		else
+		{
+			return MBEDTLS_ERR_NET_UNKNOWN_HOST;
+		}
+	}
+
+    ctx->fd = (int) socket( sockAddr.sin_family,
+						proto == MBEDTLS_NET_PROTO_UDP ? SOCK_DGRAM : SOCK_STREAM,
+                        proto == MBEDTLS_NET_PROTO_UDP ? IPPROTO_UDP : IPPROTO_TCP );
+    if( ctx->fd < 0 )
     {
-        ctx->fd = (int) socket( cur->ai_family, cur->ai_socktype,
-                            cur->ai_protocol );
-        if( ctx->fd < 0 )
-        {
-            ret = MBEDTLS_ERR_NET_SOCKET_FAILED;
-            continue;
-        }
-
-        if( connect( ctx->fd, cur->ai_addr, MSVC_INT_CAST cur->ai_addrlen ) == 0 )
-        {
-            ret = 0;
-            break;
-        }
-
-        close( ctx->fd );
-        ret = MBEDTLS_ERR_NET_CONNECT_FAILED;
+        return MBEDTLS_ERR_NET_SOCKET_FAILED;
     }
 
-    freeaddrinfo( addr_list );
+    if( connect( ctx->fd, (struct sockaddr*)&sockAddr, sizeof(sockAddr) ) == 0 )
+    {
+        return 0;
+    }
 
-    return( ret );
+    close( ctx->fd );
+
+    return MBEDTLS_ERR_NET_CONNECT_FAILED;
 }
 
 /*
@@ -221,68 +229,64 @@ int mbedtls_net_connect( mbedtls_net_context *ctx, const char *host,
  */
 int mbedtls_net_bind( mbedtls_net_context *ctx, const char *bind_ip, const char *port, int proto )
 {
-    int n, ret;
-    struct addrinfo hints, *addr_list, *cur;
+    int n, ret = MBEDTLS_ERR_ERROR_CORRUPTION_DETECTED;
+
+	SOCKADDR_IN sockAddr;
 
     if( ( ret = net_prepare() ) != 0 )
         return( ret );
 
-    /* Bind to IPv6 and/or IPv4, but only in the desired protocol */
-    memset( &hints, 0, sizeof( hints ) );
-    hints.ai_family = AF_UNSPEC;
-    hints.ai_socktype = proto == MBEDTLS_NET_PROTO_UDP ? SOCK_DGRAM : SOCK_STREAM;
-    hints.ai_protocol = proto == MBEDTLS_NET_PROTO_UDP ? IPPROTO_UDP : IPPROTO_TCP;
-    if( bind_ip == NULL )
-        hints.ai_flags = AI_PASSIVE;
+	/* Code taken from VC++ 6.0's MFC Sockcore.cpp */
+	memset(&sockAddr,0,sizeof(sockAddr));
 
-    if( getaddrinfo( bind_ip, port, &hints, &addr_list ) != 0 )
-        return( MBEDTLS_ERR_NET_UNKNOWN_HOST );
+	sockAddr.sin_family = AF_INET;
+	if (bind_ip == NULL)
+		sockAddr.sin_addr.s_addr = htonl(INADDR_ANY);
+	else
+	{
+		sockAddr.sin_addr.s_addr = inet_addr(bind_ip);
+		if (sockAddr.sin_addr.s_addr == INADDR_NONE)
+		{
+			return MBEDTLS_ERR_NET_UNKNOWN_HOST;
+		}
+	}
+	sockAddr.sin_port = htons((u_short)atoi(port));
 
-    /* Try the sockaddrs until a binding succeeds */
-    ret = MBEDTLS_ERR_NET_UNKNOWN_HOST;
-    for( cur = addr_list; cur != NULL; cur = cur->ai_next )
+
+    ctx->fd = (int) socket( sockAddr.sin_family,
+						proto == MBEDTLS_NET_PROTO_UDP ? SOCK_DGRAM : SOCK_STREAM,
+                        proto == MBEDTLS_NET_PROTO_UDP ? IPPROTO_UDP : IPPROTO_TCP );
+    if( ctx->fd < 0 )
     {
-        ctx->fd = (int) socket( cur->ai_family, cur->ai_socktype,
-                            cur->ai_protocol );
-        if( ctx->fd < 0 )
-        {
-            ret = MBEDTLS_ERR_NET_SOCKET_FAILED;
-            continue;
-        }
-
-        n = 1;
-        if( setsockopt( ctx->fd, SOL_SOCKET, SO_REUSEADDR,
-                        (const char *) &n, sizeof( n ) ) != 0 )
-        {
-            close( ctx->fd );
-            ret = MBEDTLS_ERR_NET_SOCKET_FAILED;
-            continue;
-        }
-
-        if( bind( ctx->fd, cur->ai_addr, MSVC_INT_CAST cur->ai_addrlen ) != 0 )
-        {
-            close( ctx->fd );
-            ret = MBEDTLS_ERR_NET_BIND_FAILED;
-            continue;
-        }
-
-        /* Listen only makes sense for TCP */
-        if( proto == MBEDTLS_NET_PROTO_TCP )
-        {
-            if( listen( ctx->fd, MBEDTLS_NET_LISTEN_BACKLOG ) != 0 )
-            {
-                close( ctx->fd );
-                ret = MBEDTLS_ERR_NET_LISTEN_FAILED;
-                continue;
-            }
-        }
-
-        /* Bind was successful */
-        ret = 0;
-        break;
+        return MBEDTLS_ERR_NET_SOCKET_FAILED;
     }
 
-    freeaddrinfo( addr_list );
+    n = 1;
+    if( setsockopt( ctx->fd, SOL_SOCKET, SO_REUSEADDR,
+                    (const char *) &n, sizeof( n ) ) != 0 )
+    {
+        close( ctx->fd );
+        return MBEDTLS_ERR_NET_SOCKET_FAILED;
+    }
+
+    if( bind( ctx->fd, (struct sockaddr*)&sockAddr, sizeof(sockAddr) ) != 0 )
+    {
+        close( ctx->fd );
+        return MBEDTLS_ERR_NET_BIND_FAILED;
+    }
+
+    /* Listen only makes sense for TCP */
+    if( proto == MBEDTLS_NET_PROTO_TCP )
+    {
+        if( listen( ctx->fd, MBEDTLS_NET_LISTEN_BACKLOG ) != 0 )
+        {
+            close( ctx->fd );
+            return MBEDTLS_ERR_NET_LISTEN_FAILED;
+        }
+    }
+
+    /* Bind was successful */
+    ret = 0;
 
     return( ret );
 
@@ -343,7 +347,7 @@ int mbedtls_net_accept( mbedtls_net_context *bind_ctx,
     int ret = MBEDTLS_ERR_ERROR_CORRUPTION_DETECTED;
     int type;
 
-    struct sockaddr_storage client_addr;
+    struct sockaddr client_addr;
 
 #if defined(__socklen_t_defined) || defined(_SOCKLEN_T) ||  \
     defined(_SOCKLEN_T_DECLARED) || defined(__DEFINED_socklen_t) || \
@@ -399,7 +403,7 @@ int mbedtls_net_accept( mbedtls_net_context *bind_ctx,
      * then bind a new socket to accept new connections */
     if( type != SOCK_STREAM )
     {
-        struct sockaddr_storage local_addr;
+        struct sockaddr local_addr;
         int one = 1;
 
         if( connect( bind_ctx->fd, (struct sockaddr *) &client_addr, n ) != 0 )
@@ -408,10 +412,10 @@ int mbedtls_net_accept( mbedtls_net_context *bind_ctx,
         client_ctx->fd = bind_ctx->fd;
         bind_ctx->fd   = -1; /* In case we exit early */
 
-        n = sizeof( struct sockaddr_storage );
+        n = sizeof( struct sockaddr );
         if( getsockname( client_ctx->fd,
                          (struct sockaddr *) &local_addr, &n ) != 0 ||
-            ( bind_ctx->fd = (int) socket( local_addr.ss_family,
+            ( bind_ctx->fd = (int) socket( local_addr.sa_family,
                                            SOCK_DGRAM, IPPROTO_UDP ) ) < 0 ||
             setsockopt( bind_ctx->fd, SOL_SOCKET, SO_REUSEADDR,
                         (const char *) &one, sizeof( one ) ) != 0 )
@@ -427,7 +431,7 @@ int mbedtls_net_accept( mbedtls_net_context *bind_ctx,
 
     if( client_ip != NULL )
     {
-        if( client_addr.ss_family == AF_INET )
+        if( client_addr.sa_family == AF_INET )
         {
             struct sockaddr_in *addr4 = (struct sockaddr_in *) &client_addr;
             *ip_len = sizeof( addr4->sin_addr.s_addr );

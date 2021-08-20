@@ -49,7 +49,7 @@ You need the following tools to build the library with the provided makefiles:
 * Python 3.6 to generate the test code, and to generate sample programs in the development branch.
 * Perl to run the tests, and to generate some source files in the development branch.
 * CMake 3.10.2 or later (if using CMake).
-* Microsoft Visual Studio 2013 or later (if using Visual Studio).
+* Microsoft Visual Studio 6.0 or 2013 or later (if using Visual Studio).
 * Doxygen 1.8.11 or later (if building the documentation; slightly older versions should work).
 
 ### Generated source files in the development branch

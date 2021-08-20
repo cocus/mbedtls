@@ -20,6 +20,11 @@
  */
 
 #include "common.h"
+
+#include "mbedtls/platform.h"
+
+#if defined(MBEDTLS_PSA_CRYPTO_C)
+
 #include "psa_crypto_aead.h"
 #include "psa_crypto_cipher.h"
 #include "psa_crypto_core.h"
@@ -27,9 +32,6 @@
 #include "psa_crypto_hash.h"
 #include "psa_crypto_mac.h"
 
-#include "mbedtls/platform.h"
-
-#if defined(MBEDTLS_PSA_CRYPTO_C)
 
 #if defined(MBEDTLS_PSA_CRYPTO_DRIVERS)
 

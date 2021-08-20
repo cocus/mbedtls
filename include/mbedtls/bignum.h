@@ -188,9 +188,15 @@ extern "C" {
  */
 typedef struct mbedtls_mpi
 {
+#if ( defined(_MSC_VER) && _MSC_VER == 1200L )
+    int s;              /*!<  Sign: -1 if the mpi is negative, 1 otherwise */
+    size_t n;           /*!<  total # of limbs  */
+    mbedtls_mpi_uint *p;          /*!<  pointer to limbs  */
+#else
     int MBEDTLS_PRIVATE(s);              /*!<  Sign: -1 if the mpi is negative, 1 otherwise */
     size_t MBEDTLS_PRIVATE(n);           /*!<  total # of limbs  */
     mbedtls_mpi_uint *MBEDTLS_PRIVATE(p);          /*!<  pointer to limbs  */
+#endif
 }
 mbedtls_mpi;
 
@@ -881,7 +887,7 @@ int mbedtls_mpi_fill_random( mbedtls_mpi *X, size_t size,
  * This function generates a random number between \p min inclusive and
  * \p N exclusive.
  *
- * The procedure complies with RFC 6979 §3.3 (deterministic ECDSA)
+ * The procedure complies with RFC 6979 Â§3.3 (deterministic ECDSA)
  * when the RNG is a suitably parametrized instance of HMAC_DRBG
  * and \p min is \c 1.
  *

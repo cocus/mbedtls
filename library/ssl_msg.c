@@ -530,6 +530,9 @@ int mbedtls_ssl_encrypt_buf( mbedtls_ssl_context *ssl,
     int auth_done = 0;
     unsigned char * data;
     unsigned char add_data[13 + 1 + MBEDTLS_SSL_CID_OUT_LEN_MAX ];
+#if defined(MBEDTLS_SSL_PROTO_TLS1_2)
+    unsigned char mac[MBEDTLS_SSL_MAC_ADD];
+#endif
     size_t add_data_len;
     size_t post_avail;
 
@@ -666,8 +669,6 @@ int mbedtls_ssl_encrypt_buf( mbedtls_ssl_context *ssl,
             return( MBEDTLS_ERR_SSL_BUFFER_TOO_SMALL );
         }
 #if defined(MBEDTLS_SSL_PROTO_TLS1_2)
-        unsigned char mac[MBEDTLS_SSL_MAC_ADD];
-
         ssl_extract_add_data_from_record( add_data, &add_data_len, rec,
                                           transform->minor_ver,
                                           transform->taglen );
@@ -1083,9 +1084,10 @@ static void mbedtls_ssl_cf_memcpy_if_eq( unsigned char *dst,
     /* mask = c1 == c2 ? 0xff : 0x00 */
     const size_t equal = mbedtls_ssl_cf_bool_eq( c1, c2 );
     const unsigned char mask = (unsigned char) mbedtls_ssl_cf_mask_from_bit( equal );
+	size_t i;
 
     /* dst[i] = c1 == c2 ? src[i] : dst[i] */
-    for( size_t i = 0; i < len; i++ )
+    for( i = 0; i < len; i++ )
         dst[i] = ( src[i] & mask ) | ( dst[i] & ~mask );
 }
 
@@ -1206,6 +1208,16 @@ int mbedtls_ssl_decrypt_buf( mbedtls_ssl_context const *ssl,
     size_t olen;
     mbedtls_cipher_mode_t mode;
     int ret, auth_done = 0;
+#if defined(MBEDTLS_SSL_PROTO_TLS1_2)
+	size_t pad_count;
+	unsigned char* check;
+    size_t padding_idx;
+    size_t num_checks;
+    size_t start_idx;
+    size_t idx;
+    size_t max_len;
+    size_t min_len;
+#endif
 #if defined(MBEDTLS_SSL_SOME_SUITES_USE_MAC)
     size_t padlen = 0, correct = 1;
 #endif
@@ -1561,15 +1573,14 @@ int mbedtls_ssl_decrypt_buf( mbedtls_ssl_context const *ssl,
             * validity of the padding, always perform exactly
             * `min(256,plaintext_len)` reads (but take into account
             * only the last `padlen` bytes for the padding check). */
-        size_t pad_count = 0;
-        volatile unsigned char* const check = data;
+        pad_count = 0;
+        check = data;
 
         /* Index of first padding byte; it has been ensured above
             * that the subtraction is safe. */
-        size_t const padding_idx = rec->data_len - padlen;
-        size_t const num_checks = rec->data_len <= 256 ? rec->data_len : 256;
-        size_t const start_idx = rec->data_len - num_checks;
-        size_t idx;
+        padding_idx = rec->data_len - padlen;
+        num_checks = rec->data_len <= 256 ? rec->data_len : 256;
+        start_idx = rec->data_len - num_checks;
 
         for( idx = start_idx; idx < rec->data_len; idx++ )
         {
@@ -1648,8 +1659,8 @@ int mbedtls_ssl_decrypt_buf( mbedtls_ssl_context const *ssl,
             * Note that max_len + maclen is never more than the buffer
             * length, as we previously did in_msglen -= maclen too.
             */
-        const size_t max_len = rec->data_len + padlen;
-        const size_t min_len = ( max_len > 256 ) ? max_len - 256 : 0;
+        max_len = rec->data_len + padlen;
+        min_len = ( max_len > 256 ) ? max_len - 256 : 0;
 
         ret = mbedtls_ssl_cf_hmac( &transform->md_ctx_dec,
                                     add_data, add_data_len,

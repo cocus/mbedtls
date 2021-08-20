@@ -19,10 +19,9 @@
  */
 
 #include "common.h"
-#include "psa/crypto.h"
 
 #if defined(MBEDTLS_PSA_CRYPTO_CLIENT)
-
+#include "psa/crypto.h"
 #include <string.h>
 #include "mbedtls/platform.h"
 #if !defined(MBEDTLS_PLATFORM_C)
